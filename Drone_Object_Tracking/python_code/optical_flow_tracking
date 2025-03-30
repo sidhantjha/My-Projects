@@ -1,0 +1,46 @@
+import cv2
+import numpy as np
+
+# Load video
+cap = cv2.VideoCapture("./drone_footage.mp4")
+
+# Read first frame
+ret, old_frame = cap.read()
+old_gray = cv2.cvtColor(old_frame, cv2.COLOR_BGR2GRAY)
+
+# Manually select object to track
+bbox = cv2.selectROI("Select Object", old_frame, False)
+x, y, w, h = bbox
+
+# Extract initial tracking points
+p0 = np.array([[x + w // 2, y + h // 2]], dtype=np.float32)
+
+# Lucas-Kanade Optical Flow parameters
+lk_params = dict(winSize=(15, 15), maxLevel=2,
+                 criteria=(cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 10, 0.03))
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    # Compute Optical Flow
+    p1, st, err = cv2.calcOpticalFlowPyrLK(old_gray, frame_gray, p0, None, **lk_params)
+
+    if st[0][0] == 1:  # If found, draw circle at new position
+        x, y = p1[0].ravel()
+        cv2.circle(frame, (int(x), int(y)), 10, (0, 255, 0), -1)
+
+        # Update previous frame and points
+        old_gray = frame_gray.copy()
+        p0 = p1.reshape(-1, 1, 2)
+
+    cv2.imshow("Optical Flow Tracking", frame)
+
+    if cv2.waitKey(20) & 0xFF == ord("q"):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
